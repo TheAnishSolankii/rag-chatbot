@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply bg-base text-text-primary font-sans;
+    min-height: 100dvh;
+  }
+
+  /* Thin custom scrollbar — webkit */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-base-50; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-accent-400; }
+
+  /* Firefox */
+  * { scrollbar-width: thin; scrollbar-color: theme('colors.border.DEFAULT') theme('colors.base.50'); }
+}
+
+/* ── Component helpers ───────────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+           bg-accent-500 hover:bg-accent-400 text-white font-medium
+           transition-all duration-200 shadow-glow-sm hover:shadow-glow
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
+           focus:outline-none focus:ring-2 focus:ring-accent-400 focus:ring-offset-2 focus:ring-offset-base;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg
+           text-text-secondary hover:text-text-primary hover:bg-surface-50
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-accent-400 focus:ring-offset-1 focus:ring-offset-base;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg
+           text-error hover:bg-error/10
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-error/50 focus:ring-offset-1 focus:ring-offset-base;
+  }
+
+  .card {
+    @apply bg-surface border border-border rounded-xl shadow-card;
+  }
+
+  .input {
+    @apply w-full px-3 py-2.5 rounded-lg
+           bg-base-50 border border-border
+           text-text-primary placeholder:text-text-muted
+           focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500
+           transition-colors duration-200;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* Shimmer skeleton loader */
+  .skeleton {
+    @apply bg-gradient-to-r from-surface via-surface-50 to-surface
+           bg-[length:200%_100%] animate-shimmer rounded;
+  }
+}
+
+/* ── Markdown prose inside chat bubbles ─────────────────────────────────── */
+.chat-prose {
+  @apply text-sm leading-relaxed text-text-primary;
+}
+.chat-prose p      { @apply mb-3 last:mb-0; }
+.chat-prose h1,
+.chat-prose h2,
+.chat-prose h3     { @apply font-semibold text-text-primary mt-4 mb-2; }
+.chat-prose h1     { @apply text-lg; }
+.chat-prose h2     { @apply text-base; }
+.chat-prose h3     { @apply text-sm; }
+.chat-prose ul     { @apply list-disc pl-5 mb-3 space-y-1; }
+.chat-prose ol     { @apply list-decimal pl-5 mb-3 space-y-1; }
+.chat-prose li     { @apply text-text-secondary; }
+.chat-prose code:not(pre code) {
+  @apply font-mono text-accent-300 bg-base-100 px-1.5 py-0.5 rounded text-xs;
+}
+.chat-prose pre    { @apply bg-base-100 rounded-lg overflow-x-auto mb-3 text-xs; }
+.chat-prose blockquote {
+  @apply border-l-4 border-accent-500 pl-4 italic text-text-secondary my-3;
+}
+.chat-prose a      { @apply text-accent-300 underline hover:text-accent-200; }
+.chat-prose table  { @apply w-full text-xs mb-3; }
+.chat-prose th     { @apply px-3 py-2 bg-surface-50 text-text-secondary font-medium text-left border border-border; }
+.chat-prose td     { @apply px-3 py-2 border border-border text-text-secondary; }
+.chat-prose strong { @apply text-text-primary font-semibold; }
+.chat-prose hr     { @apply border-border my-4; }
