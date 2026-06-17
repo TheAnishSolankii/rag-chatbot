@@ -1,5 +1,5 @@
 """
-FAISS vector store wrapper using Gemini REST API v1 directly for embeddings.
+FAISS vector store wrapper using Gemini REST API for embeddings.
 """
 import json
 import logging
@@ -20,20 +20,15 @@ settings = get_settings()
 
 
 class GeminiEmbeddings(Embeddings):
-    """
-    Calls Gemini v1 REST API directly to avoid v1beta SDK limitation.
-    text-embedding-004 works on v1 but not v1beta.
-    """
-
-    BASE_URL = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent"
-    BATCH_URL = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:batchEmbedContents"
+    """Calls Gemini REST API directly."""
 
     def __init__(self, api_key: str):
         self.api_key = api_key
+        self.base = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004"
 
-    def _embed_single(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
+    def _embed(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
         resp = requests.post(
-            self.BASE_URL,
+            f"{self.base}:embedContent",
             params={"key": self.api_key},
             json={
                 "model": "models/text-embedding-004",
@@ -46,112 +41,59 @@ class GeminiEmbeddings(Embeddings):
         return resp.json()["embedding"]["values"]
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Batch embed using batchEmbedContents endpoint."""
-        requests_list = [
-            {
-                "model": "models/text-embedding-004",
-                "content": {"parts": [{"text": text}]},
-                "taskType": "RETRIEVAL_DOCUMENT",
-            }
-            for text in texts
-        ]
-        resp = requests.post(
-            self.BATCH_URL,
-            params={"key": self.api_key},
-            json={"requests": requests_list},
-            timeout=60,
-        )
-        resp.raise_for_status()
-        return [e["values"] for e in resp.json()["embeddings"]]
+        return [self._embed(t, "RETRIEVAL_DOCUMENT") for t in texts]
 
     def embed_query(self, text: str) -> List[float]:
-        return self._embed_single(text, task_type="RETRIEVAL_QUERY")
+        return self._embed(text, "RETRIEVAL_QUERY")
 
 
 class VectorStoreManager:
-    """Singleton-style manager — instantiate once at startup."""
-
     def __init__(self):
         self._lock = threading.Lock()
         self._embeddings = GeminiEmbeddings(api_key=settings.GEMINI_API_KEY)
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
-
         self._registry: Dict[str, dict] = {}
         self._registry_path = self._index_path / "registry.json"
-
         self._store: Optional[FAISS] = None
         self._load()
 
-    def add_documents(
-        self,
-        documents: List[Document],
-        doc_id: str,
-        filename: str,
-        page_count: int,
-        size_bytes: int,
-    ) -> None:
+    def add_documents(self, documents: List[Document], doc_id: str, filename: str, page_count: int, size_bytes: int) -> None:
         if not documents:
-            logger.warning("add_documents called with empty list for doc_id=%s", doc_id)
             return
-
         with self._lock:
             if self._store is None:
                 self._store = FAISS.from_documents(documents, self._embeddings)
             else:
                 self._store.add_documents(documents)
-
             self._registry[doc_id] = {
-                "doc_id": doc_id,
-                "filename": filename,
-                "page_count": page_count,
-                "chunk_count": len(documents),
-                "upload_time": datetime.now(timezone.utc).isoformat(),
-                "size_bytes": size_bytes,
-                "status": "ready",
+                "doc_id": doc_id, "filename": filename, "page_count": page_count,
+                "chunk_count": len(documents), "upload_time": datetime.now(timezone.utc).isoformat(),
+                "size_bytes": size_bytes, "status": "ready",
             }
             self._persist()
-
         logger.info("Indexed %d chunks for doc_id=%s", len(documents), doc_id)
 
-    def search(
-        self, query: str, k: int = 5, doc_ids: Optional[List[str]] = None
-    ) -> List[Tuple[Document, float]]:
+    def search(self, query: str, k: int = 5, doc_ids: Optional[List[str]] = None) -> List[Tuple[Document, float]]:
         if self._store is None:
             return []
-
         fetch_k = k * 4 if doc_ids else k
         results = self._store.similarity_search_with_score(query, k=fetch_k)
-
         if doc_ids:
             doc_id_set = set(doc_ids)
-            results = [
-                (doc, score)
-                for doc, score in results
-                if doc.metadata.get("doc_id") in doc_id_set
-            ]
-
+            results = [(doc, score) for doc, score in results if doc.metadata.get("doc_id") in doc_id_set]
         return results[:k]
 
     def delete_document(self, doc_id: str) -> bool:
         with self._lock:
             if doc_id not in self._registry:
                 return False
-
             if self._store is not None:
                 all_docs = list(self._store.docstore._dict.values())
-                keep_docs = [
-                    d for d in all_docs if d.metadata.get("doc_id") != doc_id
-                ]
-                if keep_docs:
-                    self._store = FAISS.from_documents(keep_docs, self._embeddings)
-                else:
-                    self._store = None
-
+                keep_docs = [d for d in all_docs if d.metadata.get("doc_id") != doc_id]
+                self._store = FAISS.from_documents(keep_docs, self._embeddings) if keep_docs else None
             del self._registry[doc_id]
             self._persist()
-
-        logger.info("Deleted doc_id=%s from index", doc_id)
         return True
 
     def get_registry(self) -> List[dict]:
@@ -161,9 +103,7 @@ class VectorStoreManager:
         return self._registry.get(doc_id)
 
     def index_size(self) -> int:
-        if self._store is None:
-            return 0
-        return self._store.index.ntotal
+        return self._store.index.ntotal if self._store else 0
 
     def document_count(self) -> int:
         return len(self._registry)
@@ -175,30 +115,22 @@ class VectorStoreManager:
             json.dump(self._registry, f, indent=2, default=str)
 
     def _load(self) -> None:
-        faiss_file = self._index_path / "index.faiss"
-        if faiss_file.exists():
+        if (self._index_path / "index.faiss").exists():
             try:
-                self._store = FAISS.load_local(
-                    str(self._index_path),
-                    self._embeddings,
-                    allow_dangerous_deserialization=True,
-                )
+                self._store = FAISS.load_local(str(self._index_path), self._embeddings, allow_dangerous_deserialization=True)
                 logger.info("Loaded FAISS index with %d vectors", self.index_size())
             except Exception as exc:
                 logger.error("Could not load FAISS index: %s", exc)
                 self._store = None
-
         if self._registry_path.exists():
             try:
                 with open(self._registry_path, encoding="utf-8") as f:
                     self._registry = json.load(f)
             except Exception as exc:
                 logger.error("Could not load registry: %s", exc)
-                self._registry = {}
 
 
 _manager: Optional[VectorStoreManager] = None
-
 
 def get_vector_store() -> VectorStoreManager:
     global _manager
