@@ -1,16 +1,9 @@
 """
 FAISS vector store wrapper.
-
-Responsibilities:
-  - Persist the FAISS index and its docstore to disk (thread-safe writes)
-  - Add / delete document chunks
-  - Similarity search with score and metadata
-  - In-memory document registry for fast O(1) lookups by doc_id
 """
 import json
 import logging
 import threading
-import uuid
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
@@ -30,11 +23,11 @@ class VectorStoreManager:
 
     def __init__(self):
         self._lock = threading.Lock()
-       self._embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",
-    google_api_key=settings.GEMINI_API_KEY,
-    task_type="retrieval_document",
-)
+        self._embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/text-embedding-004",
+            google_api_key=settings.GEMINI_API_KEY,
+            task_type="retrieval_document",
+        )
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
 
@@ -43,8 +36,6 @@ class VectorStoreManager:
 
         self._store: Optional[FAISS] = None
         self._load()
-
-    # ── Public API ─────────────────────────────────────────────────────────────
 
     def add_documents(
         self,
@@ -106,7 +97,6 @@ class VectorStoreManager:
                 keep_docs = [
                     d for d in all_docs if d.metadata.get("doc_id") != doc_id
                 ]
-
                 if keep_docs:
                     self._store = FAISS.from_documents(keep_docs, self._embeddings)
                 else:
@@ -131,8 +121,6 @@ class VectorStoreManager:
 
     def document_count(self) -> int:
         return len(self._registry)
-
-    # ── Persistence ────────────────────────────────────────────────────────────
 
     def _persist(self) -> None:
         if self._store is not None:
@@ -162,8 +150,6 @@ class VectorStoreManager:
                 logger.error("Could not load registry: %s", exc)
                 self._registry = {}
 
-
-# ── Module-level singleton ────────────────────────────────────────────────────
 
 _manager: Optional[VectorStoreManager] = None
 
