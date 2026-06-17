@@ -1,14 +1,14 @@
 """
-FAISS vector store wrapper using direct Google Generative AI embeddings.
+FAISS vector store wrapper using Gemini REST API v1 directly for embeddings.
 """
 import json
 import logging
 import threading
+import requests
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
 
-import google.generativeai as genai
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
 from langchain.embeddings.base import Embeddings
@@ -20,30 +20,52 @@ settings = get_settings()
 
 
 class GeminiEmbeddings(Embeddings):
-    """Direct Gemini embedding using google-generativeai SDK."""
+    """
+    Calls Gemini v1 REST API directly to avoid v1beta SDK limitation.
+    text-embedding-004 works on v1 but not v1beta.
+    """
 
-    def __init__(self, api_key: str, model: str = "models/text-embedding-004"):
-        genai.configure(api_key=api_key)
-        self.model = model
+    BASE_URL = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent"
+    BATCH_URL = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:batchEmbedContents"
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def _embed_single(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
+        resp = requests.post(
+            self.BASE_URL,
+            params={"key": self.api_key},
+            json={
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": text}]},
+                "taskType": task_type,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()["embedding"]["values"]
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        embeddings = []
-        for text in texts:
-            result = genai.embed_content(
-                model=self.model,
-                content=text,
-                task_type="retrieval_document",
-            )
-            embeddings.append(result["embedding"])
-        return embeddings
+        """Batch embed using batchEmbedContents endpoint."""
+        requests_list = [
+            {
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": text}]},
+                "taskType": "RETRIEVAL_DOCUMENT",
+            }
+            for text in texts
+        ]
+        resp = requests.post(
+            self.BATCH_URL,
+            params={"key": self.api_key},
+            json={"requests": requests_list},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return [e["values"] for e in resp.json()["embeddings"]]
 
     def embed_query(self, text: str) -> List[float]:
-        result = genai.embed_content(
-            model=self.model,
-            content=text,
-            task_type="retrieval_query",
-        )
-        return result["embedding"]
+        return self._embed_single(text, task_type="RETRIEVAL_QUERY")
 
 
 class VectorStoreManager:
@@ -51,10 +73,7 @@ class VectorStoreManager:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._embeddings = GeminiEmbeddings(
-            api_key=settings.GEMINI_API_KEY,
-            model="models/text-embedding-004",
-        )
+        self._embeddings = GeminiEmbeddings(api_key=settings.GEMINI_API_KEY)
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
 
