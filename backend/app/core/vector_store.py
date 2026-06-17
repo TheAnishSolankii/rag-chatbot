@@ -24,9 +24,8 @@ class VectorStoreManager:
     def __init__(self):
         self._lock = threading.Lock()
         self._embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="gemini-embedding-exp-03-07",
             google_api_key=settings.GEMINI_API_KEY,
-            task_type="retrieval_document",
         )
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
