@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2, Bot, FileText, AlertCircle, Download, FileJson } from 'lucide-react'
-import { useChat } from '../../hooks/useChat'
-import { useDocuments } from '../../hooks/useDocuments'
-import { useChatExport } from '../../hooks/useChatExport'
-import { useToast } from '../../context/ToastContext'
-import ChatMessage from '../../components/Chat/ChatMessage'
-import ChatInput from '../../components/Chat/ChatInput'
-import Tooltip from '../../components/UI/Tooltip'
+import { useChat } from '../hooks/useChat'
+import { useDocuments } from '../hooks/useDocuments'
+import { useChatExport } from '../hooks/useChatExport'
+import { useToast } from '../context/ToastContext'
+import ChatMessage from '../components/Chat/ChatMessage'
+import ChatInput from '../components/Chat/ChatInput'
+import Tooltip from '../components/UI/Tooltip'
 
 function EmptyState({ docCount }) {
   return (
