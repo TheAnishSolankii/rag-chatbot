@@ -1,5 +1,5 @@
 """
-FAISS vector store wrapper.
+FAISS vector store wrapper using direct Google Generative AI embeddings.
 """
 import json
 import logging
@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
 
+import google.generativeai as genai
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.embeddings.base import Embeddings
 
 from app.config import get_settings
 
@@ -18,14 +19,41 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+class GeminiEmbeddings(Embeddings):
+    """Direct Gemini embedding using google-generativeai SDK."""
+
+    def __init__(self, api_key: str, model: str = "models/text-embedding-004"):
+        genai.configure(api_key=api_key)
+        self.model = model
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        embeddings = []
+        for text in texts:
+            result = genai.embed_content(
+                model=self.model,
+                content=text,
+                task_type="retrieval_document",
+            )
+            embeddings.append(result["embedding"])
+        return embeddings
+
+    def embed_query(self, text: str) -> List[float]:
+        result = genai.embed_content(
+            model=self.model,
+            content=text,
+            task_type="retrieval_query",
+        )
+        return result["embedding"]
+
+
 class VectorStoreManager:
     """Singleton-style manager — instantiate once at startup."""
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=settings.GEMINI_API_KEY,
+        self._embeddings = GeminiEmbeddings(
+            api_key=settings.GEMINI_API_KEY,
+            model="models/text-embedding-004",
         )
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
