@@ -28,3 +28,4 @@ python-dotenv==1.0.1
 # ── HTTP client (used by openai / langchain) ──────────────────────────────────
 httpx==0.28.1
 aiofiles==24.1.0
+bcrypt==4.0.1
