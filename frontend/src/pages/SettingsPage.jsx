@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useAuth } from '../../context/AuthContext'
-import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { User, Lock, Bell, Shield, Eye, EyeOff, Check, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -66,7 +66,6 @@ function ChangePasswordForm() {
       return
     }
     setSaving(true)
-    // Simulate API call — replace with real endpoint
     await new Promise((r) => setTimeout(r, 1000))
     setSaving(false)
     setForm({ current: '', next: '', confirm: '' })
@@ -129,13 +128,11 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-y-auto bg-base">
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-        {/* Header */}
         <div>
           <h1 className="text-xl font-bold text-text-primary">Settings</h1>
           <p className="text-text-muted text-sm mt-0.5">Manage your account and preferences</p>
         </div>
 
-        {/* Profile */}
         <Section icon={User} title="Account" description="Your account information">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-accent-500/20 border border-accent-500/30 flex items-center justify-center flex-shrink-0 shadow-glow-sm">
@@ -158,12 +155,10 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        {/* Security */}
         <Section icon={Lock} title="Security" description="Update your password">
           <ChangePasswordForm />
         </Section>
 
-        {/* Chat preferences */}
         <Section icon={Bell} title="Chat preferences" description="Customise your chat experience">
           <div className="space-y-4">
             <Toggle
@@ -189,7 +184,6 @@ export default function SettingsPage() {
           </div>
         </Section>
 
-        {/* Danger zone */}
         <Section icon={Shield} title="Danger zone" description="Irreversible actions">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-error/5 border border-error/15">
