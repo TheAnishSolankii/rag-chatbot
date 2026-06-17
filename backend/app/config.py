@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List, Optional
 
-
 class Settings(BaseSettings):
     # ── App ──────────────────────────────────────────────────────────────────
     APP_NAME: str = "RAG Chatbot API"
@@ -20,26 +19,26 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # ── OpenAI ───────────────────────────────────────────────────────────────
-    OPENAI_API_KEY: str                          # REQUIRED
-    OPENAI_CHAT_MODEL: str = "gpt-4.1"
-    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
-    OPENAI_MAX_TOKENS: int = 2048
-    OPENAI_TEMPERATURE: float = 0.2
+    # ── Gemini ───────────────────────────────────────────────────────────────
+    GEMINI_API_KEY: str                          # REQUIRED
+    GEMINI_CHAT_MODEL: str = "gemini-1.5-flash"
+    GEMINI_EMBEDDING_MODEL: str = "models/embedding-001"
+    GEMINI_MAX_TOKENS: int = 2048
+    GEMINI_TEMPERATURE: float = 0.2
 
     # ── Database ──────────────────────────────────────────────────────────────
     DATABASE_URL: Optional[str] = "sqlite:///./data/ragchatbot.db"
 
     # ── Vector Store ──────────────────────────────────────────────────────────
     FAISS_INDEX_PATH: str = "./data/faiss_index"
-    FAISS_DIMENSION: int = 1536  # text-embedding-3-small output size
+    FAISS_DIMENSION: int = 768  # Gemini embedding-001 output size
 
     # ── Document Processing ───────────────────────────────────────────────────
     UPLOAD_DIR: str = "./data/uploads"
     MAX_UPLOAD_SIZE_MB: int = 50
-    CHUNK_SIZE: int = 1000          # characters per chunk
-    CHUNK_OVERLAP: int = 200        # overlap between consecutive chunks
-    MAX_RETRIEVAL_DOCS: int = 5     # top-k docs to retrieve per query
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+    MAX_RETRIEVAL_DOCS: int = 5
 
     # ── Rate Limiting ─────────────────────────────────────────────────────────
     RATE_LIMIT_PER_MINUTE: int = 30
@@ -52,14 +51,12 @@ class Settings(BaseSettings):
         "http://frontend:3000",
     ]
 
-    # ── Users (simple in-memory auth — swap with DB in production) ────────────
-    # Format: "username:hashed_password,username2:hashed_password2"
+    # ── Users ─────────────────────────────────────────────────────────────────
     DEMO_USERS: str = "admin:admin123,user:user123"
 
     class Config:
         env_file = ".env"
         case_sensitive = True
-
 
 @lru_cache()
 def get_settings() -> Settings:
