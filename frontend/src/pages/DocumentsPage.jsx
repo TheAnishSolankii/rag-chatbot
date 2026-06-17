@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MessageSquare, RefreshCw, Database, Layers, Search, X } from 'lucide-react'
-import { useDocuments } from "../hooks/useDocuments"
-import { useToast } from '../../context/ToastContext'
-import { useDebounce } from '../../hooks/utils'
-import FileUploader from '../../components/Documents/FileUploader'
-import DocumentList from '../../components/Documents/DocumentList'
-import { StatCard } from '../../components/UI/Primitives'
+import { useDocuments } from '../hooks/useDocuments'
+import { useToast } from '../context/ToastContext'
+import { useDebounce } from '../hooks/utils'
+import FileUploader from '../components/Documents/FileUploader'
+import DocumentList from '../components/Documents/DocumentList'
+import { StatCard } from '../components/UI/Primitives'
 
 export default function DocumentsPage() {
   const toast = useToast()
