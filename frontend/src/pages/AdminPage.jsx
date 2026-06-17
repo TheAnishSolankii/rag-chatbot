@@ -4,11 +4,11 @@ import {
   Plus, Trash2, RefreshCw, AlertCircle, Loader2,
   ChevronDown, Calendar, User, Eye, EyeOff,
 } from 'lucide-react'
-import { useAdmin } from '../../hooks/useAdmin'
-import { useToast } from '../../context/ToastContext'
-import { useAuth } from '../../context/AuthContext'
-import { StatCard, Badge, EmptyState } from '../../components/UI/Primitives'
-import Modal from '../../components/UI/Modal'
+import { useAdmin } from '../hooks/useAdmin'
+import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
+import { StatCard, Badge, EmptyState } from '../components/UI/Primitives'
+import Modal from '../components/UI/Modal'
 import clsx from 'clsx'
 
 // ── Create User Modal ─────────────────────────────────────────────────────────
@@ -182,7 +182,6 @@ export default function AdminPage() {
     <div className="h-full overflow-y-auto bg-base">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-text-primary">Admin Panel</h1>
@@ -201,7 +200,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Stats row */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Users"     value={stats.total_users}     icon={Users}    />
@@ -211,7 +209,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="flex gap-1 p-1 bg-surface rounded-xl border border-border w-fit">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
@@ -223,7 +220,6 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* ── Users tab ───────────────────────────────────────────────────── */}
         {tab === 'users' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -241,9 +237,7 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-border bg-surface-50">
                       {['User', 'Role', 'Status', 'Last login', ''].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-widest">
-                          {h}
-                        </th>
+                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-widest">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -258,7 +252,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── System tab ──────────────────────────────────────────────────── */}
         {tab === 'stats' && stats && (
           <div className="grid gap-4 sm:grid-cols-2">
             {[
@@ -277,7 +270,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── Audit log tab ────────────────────────────────────────────────── */}
         {tab === 'audit' && (
           <div className="card overflow-hidden">
             {audit.length === 0 ? (
