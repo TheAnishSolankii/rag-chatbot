@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.config import get_settings
 
@@ -30,14 +30,13 @@ class VectorStoreManager:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._embeddings = OpenAIEmbeddings(
-            model=settings.OPENAI_EMBEDDING_MODEL,
-            openai_api_key=settings.OPENAI_API_KEY,
+        self._embeddings = GoogleGenerativeAIEmbeddings(
+            model=settings.GEMINI_EMBEDDING_MODEL,
+            google_api_key=settings.GEMINI_API_KEY,
         )
         self._index_path = Path(settings.FAISS_INDEX_PATH)
         self._index_path.mkdir(parents=True, exist_ok=True)
 
-        # Registry: doc_id → metadata dict (filename, page_count, chunk_count, …)
         self._registry: Dict[str, dict] = {}
         self._registry_path = self._index_path / "registry.json"
 
@@ -54,7 +53,6 @@ class VectorStoreManager:
         page_count: int,
         size_bytes: int,
     ) -> None:
-        """Embed and index a list of LangChain Documents."""
         if not documents:
             logger.warning("add_documents called with empty list for doc_id=%s", doc_id)
             return
@@ -81,15 +79,9 @@ class VectorStoreManager:
     def search(
         self, query: str, k: int = 5, doc_ids: Optional[List[str]] = None
     ) -> List[Tuple[Document, float]]:
-        """
-        Return top-k (Document, score) pairs.
-        Optionally filter to specific doc_ids (post-filter — FAISS doesn't support
-        native metadata filtering, so we over-fetch and trim).
-        """
         if self._store is None:
             return []
 
-        # Over-fetch when filtering to ensure we get k results after the filter
         fetch_k = k * 4 if doc_ids else k
         results = self._store.similarity_search_with_score(query, k=fetch_k)
 
@@ -104,13 +96,11 @@ class VectorStoreManager:
         return results[:k]
 
     def delete_document(self, doc_id: str) -> bool:
-        """Remove all chunks belonging to a doc_id and rebuild the index."""
         with self._lock:
             if doc_id not in self._registry:
                 return False
 
             if self._store is not None:
-                # Collect IDs of chunks belonging to this document
                 all_docs = list(self._store.docstore._dict.values())
                 keep_docs = [
                     d for d in all_docs if d.metadata.get("doc_id") != doc_id
@@ -134,7 +124,6 @@ class VectorStoreManager:
         return self._registry.get(doc_id)
 
     def index_size(self) -> int:
-        """Total number of indexed vectors."""
         if self._store is None:
             return 0
         return self._store.index.ntotal
@@ -145,14 +134,12 @@ class VectorStoreManager:
     # ── Persistence ────────────────────────────────────────────────────────────
 
     def _persist(self) -> None:
-        """Save FAISS index + docstore + registry to disk."""
         if self._store is not None:
             self._store.save_local(str(self._index_path))
         with open(self._registry_path, "w", encoding="utf-8") as f:
             json.dump(self._registry, f, indent=2, default=str)
 
     def _load(self) -> None:
-        """Load existing index from disk on startup."""
         faiss_file = self._index_path / "index.faiss"
         if faiss_file.exists():
             try:
