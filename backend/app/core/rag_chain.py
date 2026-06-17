@@ -5,11 +5,8 @@ Pipeline per query:
   1. Retrieve top-k relevant chunks from FAISS
   2. Format them as context with source citations
   3. Build a prompt that includes conversation history
-  4. Stream GPT-4.1 completion token-by-token
+  4. Stream Gemini completion token-by-token
   5. Return final answer + structured source citations
-
-Conversation memory is stored in-process (per session_id).
-For multi-instance deployments, replace with Redis-backed memory.
 """
 import logging
 import uuid
@@ -18,7 +15,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 from langchain.schema import Document
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 
 from app.config import get_settings
@@ -48,7 +45,7 @@ Context from relevant document sections:
 class ConversationMemory:
     """Simple in-memory per-session message history."""
 
-    MAX_HISTORY = 20  # keep last N messages to avoid excessive token usage
+    MAX_HISTORY = 20
 
     def __init__(self):
         self._sessions: Dict[str, List[ChatMessage]] = defaultdict(list)
@@ -62,7 +59,6 @@ class ConversationMemory:
                 sources=sources,
             )
         )
-        # Trim to keep only the last MAX_HISTORY messages
         if len(self._sessions[session_id]) > self.MAX_HISTORY:
             self._sessions[session_id] = self._sessions[session_id][-self.MAX_HISTORY:]
 
@@ -73,7 +69,6 @@ class ConversationMemory:
         self._sessions.pop(session_id, None)
 
 
-# Module-level memory store (shared across requests)
 memory = ConversationMemory()
 
 
@@ -82,18 +77,15 @@ memory = ConversationMemory()
 class RAGChain:
     def __init__(self, vector_store: VectorStoreManager):
         self.vs = vector_store
-        self.llm = ChatOpenAI(
-            model=settings.OPENAI_CHAT_MODEL,
-            openai_api_key=settings.OPENAI_API_KEY,
-            temperature=settings.OPENAI_TEMPERATURE,
-            max_tokens=settings.OPENAI_MAX_TOKENS,
+        self.llm = ChatGoogleGenerativeAI(
+            model=settings.GEMINI_CHAT_MODEL,
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=settings.GEMINI_TEMPERATURE,
+            max_output_tokens=settings.GEMINI_MAX_TOKENS,
             streaming=True,
         )
 
-    # ── Retrieval ─────────────────────────────────────────────────────────────
-
     def _retrieve(self, query: str) -> Tuple[str, List[SourceCitation]]:
-        """Fetch top-k chunks and format them as context + citation objects."""
         results = self.vs.search(query, k=settings.MAX_RETRIEVAL_DOCS)
         if not results:
             return "", []
@@ -119,21 +111,15 @@ class RAGChain:
                     filename=m.get("filename", "unknown"),
                     page=m.get("page", 0),
                     chunk_text=doc.page_content[:400],
-                    relevance_score=round(float(1 - score), 4),  # cosine similarity
+                    relevance_score=round(float(1 - score), 4),
                 )
             )
 
         return "\n\n---\n\n".join(context_parts), citations
 
-    # ── Message building ──────────────────────────────────────────────────────
-
-    def _build_messages(
-        self, query: str, context: str, session_id: str
-    ) -> List:
-        """Construct the full message list for the LLM call."""
+    def _build_messages(self, query: str, context: str, session_id: str) -> List:
         messages = [SystemMessage(content=SYSTEM_PROMPT.format(context=context))]
 
-        # Inject conversation history
         for msg in memory.get_history(session_id):
             if msg.role == "user":
                 messages.append(HumanMessage(content=msg.content))
@@ -143,16 +129,7 @@ class RAGChain:
         messages.append(HumanMessage(content=query))
         return messages
 
-    # ── Streaming answer ──────────────────────────────────────────────────────
-
-    async def astream_answer(
-        self, query: str, session_id: str
-    ) -> AsyncIterator[str]:
-        """
-        Async generator that yields answer tokens one-by-one.
-        The caller is responsible for collecting the full answer and
-        calling finalize() afterwards to persist it in memory.
-        """
+    async def astream_answer(self, query: str, session_id: str) -> AsyncIterator[str]:
         context, citations = self._retrieve(query)
         messages = self._build_messages(query, context, session_id)
 
@@ -163,20 +140,14 @@ class RAGChain:
                 full_answer.append(token)
                 yield token
 
-        # Persist to memory after streaming completes
         memory.add(session_id, "user", query)
         memory.add(session_id, "assistant", "".join(full_answer), sources=citations)
 
     async def aget_citations(self, query: str) -> List[SourceCitation]:
-        """Return citations for a query (called alongside streaming)."""
         _, citations = self._retrieve(query)
         return citations
 
-    # ── Non-streaming answer (for REST fallback) ──────────────────────────────
-
-    async def aget_answer(
-        self, query: str, session_id: str
-    ) -> Tuple[str, List[SourceCitation]]:
+    async def aget_answer(self, query: str, session_id: str) -> Tuple[str, List[SourceCitation]]:
         context, citations = self._retrieve(query)
         messages = self._build_messages(query, context, session_id)
 
