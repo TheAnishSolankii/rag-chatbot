@@ -24,14 +24,14 @@ class GeminiEmbeddings(Embeddings):
 
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.base = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004"
+        self.base = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001"
 
     def _embed(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> List[float]:
         resp = requests.post(
             f"{self.base}:embedContent",
             params={"key": self.api_key},
             json={
-                "model": "models/text-embedding-004",
+                "model": "models/gemini-embedding-001",
                 "content": {"parts": [{"text": text}]},
                 "taskType": task_type,
             },
